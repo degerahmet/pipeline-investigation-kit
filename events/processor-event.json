@@ -1,0 +1,10 @@
+{
+  "Records": [
+    {
+      "body": "{\"s3_bucket\":\"raw-bucket\",\"s3_key\":\"raw/source=demo/event_type=heartbeat/event_date=2025-12-28/ingest_date=2025-12-29/hour=23/event_id=example.json\"}"
+    },
+    {
+      "body": "{\"s3_bucket\":\"raw-bucket\",\"s3_key\":\"raw/source=demo/event_type=heartbeat/event_date=2025-12-28/ingest_date=2025-12-29/hour=23/event_id=example2.json\"}"
+    }
+  ]
+}

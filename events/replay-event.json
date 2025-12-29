@@ -1,0 +1,3 @@
+{
+  "body": "{\"entity_id\":\"user_123\",\"start_time\":\"2025-12-28T00:00:00Z\",\"end_time\":\"2025-12-29T00:00:00Z\",\"limit\":50,\"include_duplicates\":false}"
+}

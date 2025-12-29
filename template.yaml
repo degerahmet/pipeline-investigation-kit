@@ -1,0 +1,203 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Pipeline Investigation Kit - ingest, lag tracking, replay, optional processor.
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 30
+    MemorySize: 256
+    Tracing: Active
+    Environment:
+      Variables:
+        LOG_LEVEL: INFO
+    Architectures:
+      - arm64
+
+Parameters:
+  EnableProcessor:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+Resources:
+  RawBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: RawRetention
+            Status: Enabled
+            ExpirationInDays: 90
+
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  DedupeTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: event_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: event_id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl_epoch
+        Enabled: true
+
+  AggregatesTable:
+    Type: AWS::DynamoDB::Table
+    Condition: UseProcessor
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+
+  ReplayQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 60
+      MessageRetentionPeriod: 345600 # 4 days
+
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      TracingEnabled: true
+
+  IngestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/ingest/app.handler
+      Description: Ingest raw events, dedupe, store immutable raw JSON to S3, index in DynamoDB.
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Ref RawBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DedupeTable
+      Environment:
+        Variables:
+          RAW_BUCKET: !Ref RawBucket
+          EVENTS_TABLE: !Ref EventsTable
+          DEDUPE_TABLE: !Ref DedupeTable
+      Events:
+        IngestApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /ingest
+            Method: POST
+
+  ReplayFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/replay/app.handler
+      Description: Query events by entity + time window; push event references to SQS for replay.
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventsTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt ReplayQueue.QueueName
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt ReplayQueue.Arn
+
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref EventsTable
+          REPLAY_QUEUE_URL: !Ref ReplayQueue
+      Events:
+        ReplayApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /replay
+            Method: POST
+
+  ProcessorFunction:
+    Type: AWS::Serverless::Function
+    Condition: UseProcessor
+    Properties:
+      Handler: src/processor/app.handler
+      Timeout: 60
+      MemorySize: 512
+      Description: "Optional processor: fetch raw from S3, normalize, compute placeholder aggregates with versioning."
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref RawBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AggregatesTable
+      Environment:
+        Variables:
+          RAW_BUCKET: !Ref RawBucket
+          AGG_TABLE: !Ref AggregatesTable
+      Events:
+        FromReplayQueue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ReplayQueue.Arn
+            BatchSize: 10
+
+Conditions:
+  UseProcessor: !Equals [!Ref EnableProcessor, "true"]
+
+Outputs:
+  ApiUrl:
+    Description: API endpoint base URL
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+  RawBucketName:
+    Value: !Ref RawBucket
+  EventsTableName:
+    Value: !Ref EventsTable
+  DedupeTableName:
+    Value: !Ref DedupeTable
+  ReplayQueueUrl:
+    Value: !Ref ReplayQueue
