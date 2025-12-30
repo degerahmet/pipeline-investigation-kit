@@ -4,36 +4,50 @@ This document expands on the high-level architecture described in the README and
 
 ## High level
 
+```
 Producer → API Gateway → Ingest Lambda → S3 + DynamoDB
 Replay API → Replay Lambda → SQS → Processor Lambda → DynamoDB
+```
 
 The system stores immutable raw events in S3 and keeps index/metadata in DynamoDB for quick retrieval by entity/time window. Replay reads the index and produces minimal messages that reference S3 objects for processing.
 
 ## Components
 
 - Ingest service (`src/ingest`)
+
+```
   - receives events via API Gateway
   - validates events and applies idempotency
   - writes raw event JSON to S3 and metadata to DynamoDB
   - emits metrics for ingest count, duplicates, and lag
+```
 
 - Replay service (`src/replay`)
+
+```
   - accepts replay requests (entity + time window)
   - queries DynamoDB to find matching events
   - enqueues replay messages to SQS for downstream processors
+```
 
 - Processor service (`src/processor`)
+
+```
   - consumes SQS messages produced by Replay
   - reads raw events from S3
   - performs domain-specific processing (aggregation, update DynamoDB)
   - emits success / error metrics
+```
 
 - Shared utilities (`src/shared`)
+
+```
   - `ddb.py`: DynamoDB helper functions and table access patterns
   - `s3util.py`: S3 put/get helpers and path conventions
   - `validation.py`: event schema validation
   - `metrics.py`: metric name helpers
   - `logging.py`: structured logging wrapper
+```
 
 ## Data model notes
 
@@ -64,7 +78,3 @@ See README `Replay Semantics` for exact rules. Key points:
 
 - Least privilege IAM policies for Lambda functions is recommended.
 - Avoid embedding secrets in code; use environment variables and AWS Secrets Manager or Parameter Store.
-
----
-
-See the Developer Guide for setup, local testing, and deployment steps: docs/DEVELOPER_GUIDE.md.

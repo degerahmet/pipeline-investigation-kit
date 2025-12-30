@@ -1,0 +1,9 @@
+{
+  "IngestFunction": {
+    "DRY_RUN": "true",
+    "RAW_BUCKET": "local-bucket",
+    "EVENTS_TABLE": "local-events",
+    "DEDUPE_TABLE": "local-dedupe",
+    "LOG_LEVEL": "INFO"
+  }
+}

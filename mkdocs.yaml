@@ -1,0 +1,29 @@
+site_name: Pipeline Investigation Kit
+site_description: Serverless investigation toolkit for data pipeline delays, gaps, duplicates, and replay.
+repo_url: https://github.com/degerahmet/pipeline-investigation-kit
+repo_name: degerahmet/pipeline-investigation-kit
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Guide: dev_guide.md
+  - Architecture: architecture.md
+  - Ingest API: ingest.md
+  - Replay: replay.md
+  - Processor: processor.md
+  - FAQ: faq.md
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.highlight
