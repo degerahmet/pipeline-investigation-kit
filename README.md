@@ -1,131 +1,172 @@
 # Pipeline Investigation Kit
 
-A minimal, production-shaped **data pipeline investigation toolkit**.
+A minimal **event pipeline investigation & replay toolkit** built on AWS.
 
-This repository helps teams **quickly investigate pipeline issues** such as:
+This repository helps you **ingest, inspect, replay, and recompute events** safely when something goes wrong in your data pipeline.
 
-- delayed or out-of-order events
-- missing days / windows
-- duplicate events
-- unexplained aggregate changes
-
-It is **not** a full ETL pipeline.  
-It is an **observability + replay + forensics kit** that you can deploy in ~30–60 minutes.
+It is designed for **debugging and recovery**, not for replacing your main ETL or streaming system.
 
 ---
 
-## What this solves
+## What this repo does
 
-Most teams debugging data pipelines ask the same questions:
+Pipeline Investigation Kit lets you:
 
-- Where is data delayed?
-- Which source or event type fails most?
-- Which days or windows are missing?
-- Why did a daily score / metric change?
-- Can we replay raw events for a specific entity and time range?
+* ingest events **idempotently**
+* store raw events **immutably**
+* replay events by **entity + time window**
+* recompute aggregates safely
+* debug pipeline issues without pausing production
 
-This kit gives you:
+Typical use cases:
 
-- immutable raw events (S3)
-- idempotent ingestion
-- structured logs + metrics
-- replay by entity + time window
-- aggregate versioning with input hashes
-
----
-
-## Architecture (high level)
-
-Producer → API Gateway → Ingest Lambda → S3 + DynamoDB  
-Replay API → Replay Lambda → SQS → Processor Lambda → DynamoDB
+* wrong or changed metrics
+* missing or delayed events
+* duplicate ingestion
+* reprocessing historical data
+* post-mortem analysis
 
 ---
 
-## Event schema (minimal)
+## What this is NOT
+
+* ❌ not a real-time analytics system
+* ❌ not a full ETL framework
+* ❌ not a BI or reporting tool
+
+This is an **investigation, replay, and recovery kit**.
+
+---
+
+## High-level architecture
+
+```
+Producer
+  → API Gateway
+    → Ingest Lambda
+      → S3 (immutable raw events)
+      → DynamoDB (metadata & dedupe)
+
+Replay API
+  → Replay Lambda
+    → SQS
+      → Processor Lambda
+        → DynamoDB (aggregates)
+```
+
+All components are serverless and managed via **AWS SAM**.
+
+---
+
+## Event model (minimal)
 
 ```json
 {
-  "source": "ios_app | partner_api | device_stream",
-  "event_type": "heartbeat | purchase | score_update",
-  "entity_id": "user_123 | device_9",
+  "source": "demo",
+  "event_type": "heartbeat",
+  "entity_id": "user_123",
   "event_time": "2025-12-28T23:59:59Z",
-  "payload": { "any": "json" },
-  "idempotency_key": "optional-stable-producer-key"
+  "payload": { "any": "json" }
 }
 ```
 
+* events are immutable
+* deduplication is enforced at ingest time
+* duplicates are recorded, not dropped
+
 ---
 
-## Quickstart (AWS SAM)
+## Quickstart (AWS)
+
+### 1. Build & deploy
 
 ```bash
 sam build
 sam deploy --guided
 ```
 
-### Ingest
+This creates:
+
+* API Gateway
+* Lambdas (Ingest, Replay, Processor)
+* S3 bucket
+* DynamoDB tables
+* SQS queue
+
+---
+
+### 2. Ingest an event
 
 ```bash
 curl -X POST https://<API_URL>/ingest \
   -H "Content-Type: application/json" \
-  -d '{"source":"demo","event_type":"heartbeat","entity_id":"user_123","event_time":"2025-12-28T23:59:59Z","payload":{"steps":10}}'
+  -d '{
+    "source":"demo",
+    "event_type":"heartbeat",
+    "entity_id":"user_123",
+    "event_time":"2025-12-28T23:59:59Z",
+    "payload":{"steps":10}
+  }'
 ```
 
-### Replay
+---
+
+### 3. Replay events
 
 ```bash
 curl -X POST https://<API_URL>/replay \
   -H "Content-Type: application/json" \
-  -d '{"entity_id":"user_123","start_time":"2025-12-28T00:00:00Z","end_time":"2025-12-29T00:00:00Z"}'
+  -d '{
+    "entity_id":"user_123",
+    "start_time":"2025-12-28T00:00:00Z",
+    "end_time":"2025-12-29T00:00:00Z"
+  }'
 ```
+
+Replay sends matching events to SQS for reprocessing.
 
 ---
 
 ## Observability
 
-Metrics:
+The system emits structured logs and CloudWatch metrics:
 
-- IngestCount
-- DuplicateCount
-- IngestLagMs
-- ReplayMessageCount
-- ProcessorErrorCount
+* ingest counts & lag
+* duplicate counts
+* replay message counts
+* processor success / errors
 
-Logs are structured JSON.
-
----
-
-## What this is NOT
-
-- Not a full ETL pipeline
-- Not a BI system
-- Not a data quality framework
-
-This is an **investigation & replay toolkit**.
+All operations are traceable and repeatable.
 
 ---
 
-## Roadmap
+## Documentation
 
-- Missing window detection
-- Athena table definitions
-- CloudWatch dashboard template
+Full documentation is available here:
 
-## Developer docs
+👉 **[https://degerahmet.github.io/pipeline-investigation-kit/](https://degerahmet.github.io/pipeline-investigation-kit/)**
 
-- Developer guide: [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)
-- Architecture overview: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+Includes:
+
+* architecture overview
+* quickstart examples
+* service-level docs
+* developer guide
+* troubleshooting
+
+---
 
 ## Contributing
 
 Contributions are welcome.
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for:
+Please read:
 
-- design principles
-- local development rules
-- testing expectations
+* [CONTRIBUTING.md](./CONTRIBUTING.md)
 
-## Documentation
+---
 
-https://degerahmet.github.io/pipeline-investigation-kit/
+## License
+
+MIT License.
+Use freely. No warranty.
