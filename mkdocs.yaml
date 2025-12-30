@@ -12,13 +12,38 @@ theme:
     - content.code.copy
 
 nav:
-  - Home: index.md
-  - Quickstart: quickstart.md
-  - Guide: dev_guide.md
-  - Architecture: architecture.md
-  - Ingest API: ingest.md
-  - Replay: replay.md
-  - Processor: processor.md
+  - Home: 
+    - Overview: index.md
+    - Contributing: contrib.md
+    - Developer Guide:
+      - Overview: guide/guide.md
+      - Deployment: guide/deployment.md
+      - Configuration: guide/configuration.md
+      - Usage: guide/usage.md
+      - Troubleshooting: guide/troubleshooting.md
+  - Quickstart:
+    - Overview: quickstart/quickstart.md
+    - Ingest example: quickstart/ingest_example.md
+    - Replay example: quickstart/replay_example.md
+    - Processor example: quickstart/processor_example.md
+    - API Reference:
+      - Ingest: quickstart/api-reference/ingest.md
+      - Replay: quickstart/api-reference/replay.md
+      - Processor: quickstart/api-reference/processor.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Diagram: architecture/architecture.md
+    - Deployment: architecture/deployment.md
+    - Components:
+        - AWS SAM: architecture/components/sam.md
+        - API Gateway: architecture/components/apigateway.md
+        - Lambda: architecture/components/lambda.md
+        - DynamoDB: architecture/components/dynamodb.md
+        - S3: architecture/components/s3.md
+        - SQS: architecture/components/sqs.md
+        - IAM: architecture/components/iam.md
+        - CloudWatch: architecture/components/cloudwatch.md
+        - X-Ray: architecture/components/xray.md
   - FAQ: faq.md
 
 markdown_extensions:

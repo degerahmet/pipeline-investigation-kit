@@ -1,3 +1,0 @@
-# Ingest Service
-
-Coming soon...

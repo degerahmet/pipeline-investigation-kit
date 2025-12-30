@@ -125,3 +125,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for:
 - design principles
 - local development rules
 - testing expectations
+
+## Documentation
+
+https://degerahmet.github.io/pipeline-investigation-kit/
